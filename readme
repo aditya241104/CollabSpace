@@ -1,0 +1,3 @@
+used bcrypt for the hashing
+used express validator for the validation 
+used auth routers for login and the register
