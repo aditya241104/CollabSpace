@@ -7,4 +7,4 @@ const projectTeamSchema = new mongoose.Schema({
   role: String,
 });
 
-module.exports = mongoose.model("ProjectTeam", projectTeamSchema);
+export default mongoose.model("ProjectTeam", projectTeamSchema);

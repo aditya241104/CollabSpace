@@ -4,6 +4,12 @@ const teamSchema = new mongoose.Schema({
   name: { type: String, required: true },
   organizationId: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", required: true },
   createdAt: { type: Date, default: Date.now },
+  description:String,
+  createdBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User"
+}
+
 });
 
-module.exports = mongoose.model("Team", teamSchema);
+export default mongoose.model("Team", teamSchema);

@@ -9,5 +9,4 @@ const meetingSchema = new mongoose.Schema({
   recordings: [String],
   createdAt: { type: Date, default: Date.now },
 });
-
-module.exports = mongoose.model("Meeting", meetingSchema);
+export default mongoose.model("Meeting", meetingSchema);

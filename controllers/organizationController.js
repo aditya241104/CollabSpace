@@ -2,7 +2,7 @@ import Organization from "../models/Organization.js"
 import User from "../models/User.js";
 import JoinRequest from "../models/JoinRequests.js"
 import {transporter} from "../config/nodemailer.js";
-
+//create organization
 const createOrganization = async (req, res) => {
   try {
     const { orgName, orgDescription, orgLogo, adminID } = req.body;
@@ -27,10 +27,28 @@ const createOrganization = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+//send mail to any user to join organization
 const inviteUserToOrganization = async (req, res) => {
-  const { email, organizationId, invitedBy } = req.body;
+  const { email, invitedBy } = req.body;
 
   try {
+    // Step 1: Verify inviter
+    const inviter = await User.findById(invitedBy);
+
+    if (!inviter) {
+      return res.status(404).json({ message: "Inviting user not found" });
+    }
+
+    if (!inviter.organizationId) {
+      return res.status(400).json({ message: "User is not part of any organization" });
+    }
+
+    if (inviter.orgRole !== "admin") {
+      return res.status(403).json({ message: "Only admins can invite users" });
+    }
+
+    // Step 2: Use inviter's organizationId
+    const organizationId = inviter.organizationId;
 
     const inviteLink = `http://localhost:5173/join?orgId=${organizationId}&email=${encodeURIComponent(email)}`;
 
@@ -50,6 +68,7 @@ const inviteUserToOrganization = async (req, res) => {
     res.status(500).json({ message: "Failed to send invite" });
   }
 };
+//send join request to the organization
 const sendJoinRequest = async (req, res) => {
   const { userId, organizationId } = req.body;
   const user=await User.findById(userId);

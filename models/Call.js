@@ -9,4 +9,4 @@ const callSchema = new mongoose.Schema({
   meetingId: { type: mongoose.Schema.Types.ObjectId, ref: "Meeting" },
 });
 
-module.exports = mongoose.model("Call", callSchema);
+export default mongoose.model("Call", callSchema);

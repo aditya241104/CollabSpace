@@ -1,51 +1,7 @@
 import User from "../models/User.js";
-import bcrypt from 'bcrypt';
-import { validationResult } from 'express-validator';
-import jwt from 'jsonwebtoken';
 import Organization from "../models/Organization.js";
-
-const JWT_SECRET = process.env.JWT_SECRET ||"a92fe4f91c98ee5d99215d8824e1a3b83051c53f9b5a6d9cf13f82a2ab99254e";
-
-// Register user controller
-const registerUser = async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty())
-      return res.status(400).json({ errors: errors.array() });
-
-    const { userName, userEmail, userPassword, organizationId } = req.body;
-
-    // Check existing user
-    const existingUser = await User.findOne({ email: userEmail });
-    if (existingUser)
-      return res.status(400).json({ message: 'User already exists' });
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(userPassword, salt);
-
-    const user = new User({
-      name: userName,
-      email: userEmail,
-      passwordHash,
-      organizationId,
-    });
-
-    await user.save();
-
-    // Generate JWT token
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1d' });
-
-    res.status(201).json({
-      token,
-      user: { id: user._id, name: user.name, email: user.email },
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
+import bcrypt from 'bcrypt';
+//accept the invite link
 const handleInviteLink = async (req, res) => {
   const { email, organizationId } = req.body;
   const organization = await Organization.findById(organizationId);
@@ -70,4 +26,54 @@ const handleInviteLink = async (req, res) => {
     });
   }
 };
-export {registerUser,handleInviteLink};
+const updatePassword = async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Incorrect password" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    user.passwordHash = passwordHash;
+    await user.save();
+
+    res.status(200).json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Password update error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+const updateOrgRole = async (req, res) => {
+  try {
+    const { userId, newRole } = req.body;
+
+    const validRoles = ["admin", "project_manager", "developer", "hr", "viewer"];
+    if (!validRoles.includes(newRole)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.orgRole = newRole;
+    await user.save();
+
+    res.status(200).json({ message: "Role updated successfully" });
+  } catch (err) {
+    console.error("Update role error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export default updatePassword;
+
+export {handleInviteLink,updatePassword,updateOrgRole};
