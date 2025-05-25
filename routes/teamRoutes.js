@@ -7,7 +7,8 @@ import {
   changeMemberRole,
   listTeamsForUser,
   updateTeamName,
-  updateTeamDescription
+  updateTeamDescription,
+  listTeamsInOrg
 } from "../controllers/teamController.js";
 
 const router = express.Router();
@@ -35,5 +36,7 @@ router.patch("/:teamId/name", updateTeamName);
 
 // Update team description
 router.patch("/:teamId/description", updateTeamDescription);
+
+router.get("/organization/:userId", listTeamsInOrg);
 
 export default router;

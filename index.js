@@ -7,6 +7,8 @@ import organizationRoutes from './routes/organizationRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
+import projectRoutes from "./routes/projectRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -20,7 +22,8 @@ app.use('/api/organization', organizationRoutes);
 app.use('/api/invite', inviteRoutes);
 app.use('/api/user',userRoutes);
 app.use('/api/team',teamRoutes);
-
+app.use('/api/project',projectRoutes);
+app.use('/api/task',taskRoutes);
 // MongoDB Connect & Server Start
 mongoose
   .connect(process.env.MONGO_URI)

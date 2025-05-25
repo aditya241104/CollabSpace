@@ -233,4 +233,21 @@ const updateTeamDescription = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-export { createTeam, addMember, getTeamDetails, removeMember, changeMemberRole, listTeamsForUser,updateTeamName,updateTeamDescription };
+const listTeamsInOrg = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+
+    if (!user || !user.organizationId) {
+      return res.status(404).json({ message: "User not found or not in an organization" });
+    }
+
+    const teams = await Team.find({ organizationId: user.organizationId });
+
+    res.status(200).json(teams);
+  } catch (error) {
+    console.error("Error fetching teams:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+export { createTeam, addMember, getTeamDetails, removeMember, changeMemberRole, listTeamsForUser,updateTeamName,updateTeamDescription,listTeamsInOrg  };
