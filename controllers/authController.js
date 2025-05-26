@@ -2,8 +2,9 @@ import User from "../models/User.js"
 import bcrypt from 'bcrypt';
 import { validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
-
+import {createRefreshToken,deleteRefreshToken} from './refreshTokenController.js';
 const JWT_SECRET = process.env.JWT_SECRET ||"a92fe4f91c98ee5d99215d8824e1a3b83051c53f9b5a6d9cf13f82a2ab99254e";
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "your_refresh_jwt_secret";
 
 // Register user controller
 const registerUser = async (req, res) => {
@@ -34,7 +35,13 @@ const registerUser = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1d' });
-
+        const refreshToken = await createRefreshToken(user._id);
+      res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
     res.status(201).json({
       token,
       user: { id: user._id, name: user.name, email: user.email },
@@ -59,8 +66,14 @@ const loginUser= async(req,res)=>{
     if (!isPasswordCorrect) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-        const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1d' });
-
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1d' });
+    const refreshToken = await createRefreshToken(user._id);
+      res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
     res.status(200).json({
       token,
       user: {
@@ -74,12 +87,26 @@ const loginUser= async(req,res)=>{
     return res.status(500).json({message:"Server error"});
   }
 }
-const logoutUser = (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-  });
-  res.status(200).json({ message: "Logged out successfully" });
+const logoutUser = async (req, res) => {
+    try {
+    const refreshToken = req.cookies.refreshToken;
+    
+    if (refreshToken) {
+      // Delete refresh token from database
+      await deleteRefreshToken(refreshToken);
+    }
+
+    // Clear cookies
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: "strict",
+    });
+
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: "Server error during logout" });
+  }
 };
 export {registerUser,loginUser,logoutUser};

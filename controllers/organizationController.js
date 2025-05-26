@@ -233,6 +233,22 @@ const updateOrganization = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+const getOrganizationDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const organization = await Organization.findById(id);
+
+    if (!organization) {
+      return res.status(404).json({ message: 'Organization not found' });
+    }
+
+    res.status(200).json(organization);
+  } catch (error) {
+    console.error('Error fetching organization:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 export {
   createOrganization,
@@ -244,4 +260,5 @@ export {
   getOrganizationMembers,
   removeUserFromOrganization,
   updateOrganization,
+  getOrganizationDetails
 };

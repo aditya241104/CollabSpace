@@ -8,7 +8,8 @@ import {
   rejectJoinRequest,
   getOrganizationMembers,
   removeUserFromOrganization,
-  updateOrganization
+  updateOrganization,
+  getOrganizationDetails
 } from "../controllers/organizationController.js";
 
 const router = express.Router();
@@ -39,5 +40,5 @@ router.post("/remove-member", removeUserFromOrganization);
 
 // @route   PUT /api/organization/update
 router.put("/update", updateOrganization);
-
+router.get("/:id",getOrganizationDetails)
 export default router;

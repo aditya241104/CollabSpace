@@ -165,18 +165,42 @@ const listTeamsForUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const memberships = await TeamMembership.find({ userId }).populate("teamId").exec();
+    // Step 1: Get all teams the user is part of
+    const userMemberships = await TeamMembership.find({ userId }).populate("teamId");
 
-    const teams = memberships.map(m => ({
-      teamId: m.teamId._id,
-      name: m.teamId.name,
-      role: m.role,
-    }));
+    const response = [];
 
-    return res.status(200).json({ teams });
+    for (const membership of userMemberships) {
+      const team = membership.teamId;
+      const userRole = membership.role;
+
+      // Step 2: Get all members of this team
+      const members = await TeamMembership.find({ teamId: team._id })
+        .populate("userId", "name email orgRole avatar")
+        .exec();
+
+      const memberList = members.map(m => ({
+        _id: m.userId._id,
+        name: m.userId.name,
+        email: m.userId.email,
+        orgRole: m.userId.orgRole,
+        avatar: m.userId.avatar,
+        role: m.role,
+      }));
+
+      response.push({
+        teamId: team._id,
+        teamName: team.name,
+        description: team.description,
+        userRole, // current user's role in this team
+        members: memberList,
+      });
+    }
+
+    res.status(200).json(response);
   } catch (error) {
-    console.error("Error listing teams for user:", error.message);
-    return res.status(500).json({ message: "Server error" });
+    console.error("Error fetching teams with members:", error.message);
+    res.status(500).json({ message: "Server error" });
   }
 };
 const updateTeamName = async (req, res) => {

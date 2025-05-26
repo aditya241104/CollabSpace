@@ -73,7 +73,24 @@ const updateOrgRole = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+// 🔍 Get user details by ID
+const getUserDetails = async (req, res) => {
+  try {
+    const { userId } = req.params;
 
+    const user = await User.findById(userId).populate("organizationId", "name description logo");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { passwordHash, ...userInfo } = user._doc; // Exclude password hash from response
+
+    return res.status(200).json(userInfo);
+  } catch (err) {
+    console.error("Error fetching user:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
 export default updatePassword;
 
-export {handleInviteLink,updatePassword,updateOrgRole};
+export {handleInviteLink,updatePassword,updateOrgRole,getUserDetails};

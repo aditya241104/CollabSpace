@@ -2,6 +2,7 @@ import Project from "../models/Project.js";
 import User from "../models/User.js";
 import ProjectTeam from "../models/ProjectTeam.js";
 import Team from "../models/Team.js";
+import { assign } from "nodemailer/lib/shared/index.js";
 
 // Admin creates project (auto becomes project manager)
 const createProject = async (req, res) => {
@@ -106,5 +107,74 @@ const assignTeamToProject = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+const getUserProjects = async (req, res) => {
+  try {
+    const { userId } = req.params;
 
-export { createProject, addProjectManager, assignTeamToProject };
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // 1. Find all teams where user is a member
+    const teamIds = await Team.find({ members: userId }).distinct('_id');
+
+    // 2. Get projects where these teams are assigned
+    const teamAssignments = await ProjectTeam.find({ teamId: { $in: teamIds } })
+      .populate('projectId')
+      .populate('teamId');
+
+    const projectFromTeams = teamAssignments.map(assignment => ({
+      project: {
+        _id: assignment.projectId._id,
+        name: assignment.projectId.name,
+        description: assignment.projectId.description,
+        timeline: assignment.projectId.timeline,
+      },
+      team: {
+        _id: assignment.teamId._id,
+        name: assignment.teamId.name,
+        // Populate members
+        members: [],
+      },
+      userRoleInProject: assignment.role,
+    }));
+
+    // Populate team members
+    for (const p of projectFromTeams) {
+      const teamMembers = await User.find({ _id: { $in: p.team.members } }, '_id name email orgRole');
+      p.team.members = teamMembers;
+    }
+
+    // 3. Find all projects where user is directly the project manager
+    const directProjects = await Project.find({ projectManagerId: userId });
+
+    // Remove duplicates (already included from team assignments)
+    const existingProjectIds = new Set(projectFromTeams.map(p => p.project._id.toString()));
+
+    const directlyManagedProjects = [];
+
+    for (const dp of directProjects) {
+      if (!existingProjectIds.has(dp._id.toString())) {
+        directlyManagedProjects.push({
+          project: {
+            _id: dp._id,
+            name: dp.name,
+            description: dp.description,
+            timeline: dp.timeline,
+          },
+          team: null, // no team yet
+          userRoleInProject: 'project_manager',
+        });
+      }
+    }
+
+    // Combine all
+    const allProjects = [...projectFromTeams, ...directlyManagedProjects];
+
+    res.status(200).json({ projects: allProjects });
+  } catch (error) {
+    console.error("Error fetching user projects:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export { createProject, addProjectManager, assignTeamToProject,getUserProjects };
