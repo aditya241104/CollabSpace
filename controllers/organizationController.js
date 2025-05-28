@@ -175,7 +175,6 @@ const getOrganizationMembers = async (req, res) => {
     }
 
     const users = await User.find({ organizationId: admin.organizationId }).select("-password");
-
     res.status(200).json({ users });
   } catch (error) {
     console.error(error);

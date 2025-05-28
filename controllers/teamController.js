@@ -6,6 +6,7 @@ const createTeam = async(req,res)=>{
     try{
 const {teamName,userId,description}=req.body;
 const user= await User.findById(userId);
+console.log(user);
 if (!user.organizationId) {
   return res.status(400).json({ message: "User is not part of any organization" });
 }
