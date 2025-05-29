@@ -57,7 +57,6 @@ export const verifyRefreshToken = async (token) => {
 export const refreshAccessToken = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
-    
     if (!refreshToken) {
       return res.status(401).json({ message: 'Refresh token not provided' });
     }

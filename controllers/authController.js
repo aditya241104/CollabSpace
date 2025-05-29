@@ -34,7 +34,7 @@ const registerUser = async (req, res) => {
     await user.save();
 
     // Generate JWT token
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1d' });
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
         const refreshToken = await createRefreshToken(user._id);
       res.cookie('refreshToken', refreshToken, {
     httpOnly: true,

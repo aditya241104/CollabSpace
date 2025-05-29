@@ -10,35 +10,36 @@ import {
   getAllTasks,         // NEW
   deleteTask          // NEW
 } from "../controllers/taskController.js";
+import verifyToken from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 // Project Manager assigns main task
-router.post("/assign-main", assignMainTask);
+router.post("/assign-main", verifyToken,assignMainTask);
 
 // Team Manager assigns subtask
-router.post("/assign-sub", assignSubtask);
+router.post("/assign-sub",verifyToken, assignSubtask);
 
 // Team tasks
-router.get("/team/:teamId", getTasksForTeam);
+router.get("/team/:teamId", verifyToken,getTasksForTeam);
 
 // Subtasks under a main task
-router.get("/subtasks/:taskId", getSubtasksForTask);
+router.get("/subtasks/:taskId",verifyToken, getSubtasksForTask);
 
 // NEW ROUTES:
 // Get tasks assigned to a specific user (for developers)
-router.get("/user/:userId", getUserTasks);
+router.get("/user/:userId", verifyToken,getUserTasks);
 
 // Update task status (for project managers/admin)
-router.patch("/:taskId/status", updateTaskStatus);
+router.patch("/:taskId/status",verifyToken, updateTaskStatus);
 
 // Update subtask status (for assigned users/team managers/admin)
-router.patch("/subtask/:subtaskId/status", updateSubtaskStatus);
+router.patch("/subtask/:subtaskId/status",verifyToken ,updateSubtaskStatus);
 
 // Get all tasks for admin/project manager overview
-router.get("/all/:userId", getAllTasks);
+router.get("/all/:userId", verifyToken,getAllTasks);
 
 // Delete task (admin/project manager only)
-router.delete("/:taskId", deleteTask);
+router.delete("/:taskId", verifyToken,deleteTask);
 
 export default router;
