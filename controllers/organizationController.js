@@ -129,7 +129,7 @@ const acceptJoinRequest = async (req, res) => {
     });
 
     // Update request status
-    request.status = "accepted";
+    request.status = "approved";
     await request.save();
 
     res.status(200).json({ message: "Request accepted" });

@@ -16,6 +16,7 @@ useEffect(() => {
     } else {
       try {
         const newToken = await refreshAccessToken(); 
+        localStorage.setItem("token",newToken);
         setIsAuthenticated(true);
       } catch (error) {
         setIsAuthenticated(false);
@@ -47,7 +48,7 @@ useEffect(() => {
       <Routes>
         <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
 
-        <Route
+        <Route         
           path="/login"
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login onLogin={() => setIsAuthenticated(true)} />}
         />

@@ -5,6 +5,9 @@ import TeamsTab from './tabs/TeamsTab';
 import ComingSoonTab from './tabs/ComingSoonTab';
 import ManageTeams from './tabs/ManageTeams';
 import TaskManagement from './tabs/TaskManagement';
+import ProjectManagement from './tabs/ProjectManagement';
+import InviteUser from './tabs/InviteUser';
+import JoinRequestsManager from './tabs/JoinRequestsManager';
 /**
  * Dashboard Content Component
  * 
@@ -18,6 +21,7 @@ import TaskManagement from './tabs/TaskManagement';
  * - project: Array of user's projects
  */
 export default function DashboardContent({ activeTab, user, organization, team, project }) {
+   console.log('Rendering tab:', activeTab);
   switch (activeTab) {
     case 'overview':
       return <OverviewTab user={user} team={team} project={project} />;
@@ -27,10 +31,16 @@ export default function DashboardContent({ activeTab, user, organization, team, 
       return <ProjectsTab user={user} project={project} />;
     case 'teams':
       return <TeamsTab user={user} team={team} />;
-    case 'manage-teams':
+    case 'team-management':
       return <ManageTeams user={user}/>
     case 'task':
       return <TaskManagement user={user}/>
+    case 'manage-projects':
+      return <ProjectManagement user={user}/>
+    case 'invite-user':
+      return <InviteUser user={user}/>
+    case 'manage-invites':
+      return <JoinRequestsManager user={user}/>
     default:
       return <ComingSoonTab />;
   }

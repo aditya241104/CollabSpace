@@ -176,5 +176,97 @@ const getUserProjects = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+const updateProject = async (req, res) => {
+  try {
+    const { projectId, name, description, timeline, userId } = req.body;
 
-export { createProject, addProjectManager, assignTeamToProject,getUserProjects };
+    const user = await User.findById(userId);
+    const project = await Project.findById(projectId);
+
+    if (!user || !project) {
+      return res.status(404).json({ message: "User or project not found" });
+    }
+
+    // Only project manager or admin can update
+    if (!project.projectManagerId.equals(user._id) && user.orgRole !== "admin") {
+      return res.status(403).json({ message: "Only project manager or admin can update project" });
+    }
+
+    // Update fields
+    project.name = name || project.name;
+    project.description = description || project.description;
+    project.timeline = timeline || project.timeline;
+
+    await project.save();
+
+    res.status(200).json({ message: "Project updated", project });
+  } catch (error) {
+    console.error("Error updating project:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Delete project
+const deleteProject = async (req, res) => {
+  try {
+    const { projectId, userId } = req.body;
+
+    const user = await User.findById(userId);
+    const project = await Project.findById(projectId);
+
+    if (!user || !project) {
+      return res.status(404).json({ message: "User or project not found" });
+    }
+
+    // Only admin or project manager can delete
+    if (!project.projectManagerId.equals(user._id) && user.orgRole !== "admin") {
+      return res.status(403).json({ message: "Only project manager or admin can delete project" });
+    }
+
+    // Delete all related assignments first
+    await ProjectTeam.deleteMany({ projectId });
+
+    // Then delete the project
+    await Project.findByIdAndDelete(projectId);
+
+    res.status(200).json({ message: "Project deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting project:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Remove team from project
+const removeTeamFromProject = async (req, res) => {
+  try {
+    const { projectId, teamId, userId } = req.body;
+
+    const user = await User.findById(userId);
+    const project = await Project.findById(projectId);
+    const team = await Team.findById(teamId);
+
+    if (!user || !project || !team) {
+      return res.status(404).json({ message: "User, project or team not found" });
+    }
+
+    // Only project manager can remove teams
+    if (!project.projectManagerId.equals(user._id)) {
+      return res.status(403).json({ message: "Only project manager can remove teams" });
+    }
+
+    await ProjectTeam.findOneAndDelete({ projectId, teamId });
+
+    res.status(200).json({ message: "Team removed from project" });
+  } catch (error) {
+    console.error("Error removing team from project:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+export {   
+  createProject,
+  addProjectManager,
+  assignTeamToProject,
+  getUserProjects,
+  updateProject,
+  deleteProject,
+  removeTeamFromProject};

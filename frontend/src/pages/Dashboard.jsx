@@ -7,18 +7,7 @@ import DashboardLoading from '../Components/DashboardLoading';
 import NoOrganizationView from '../Components/NoOrganizationView';
 import DashboardContent from '../Components/DashboardContent';
 
-/**
- * Main Dashboard Component
- * 
- * This component serves as the entry point for the dashboard experience.
- * It handles:
- * - Authentication and user data loading
- * - Organization verification
- * - State management for the entire dashboard
- * - Routing between different dashboard views
- */
 export default function Dashboard() {
-  // Get token from localStorage and decode it
   const token = localStorage.getItem("token");
   const decodedtoken = jwtDecode(token);
   
@@ -32,7 +21,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [orgRequest, setOrgRequest] = useState('');
 
-  // Fetch user details from API
   const fetchUserDetails = async () => {
     try {
       const response = await axiosClient.get(`/user/${decodedtoken.id}`);
@@ -43,7 +31,6 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch organization details from API
   const fetchOrganizationDetails = async (organizationId) => {
     try {
       const response = await axiosClient.get(`/organization/${organizationId}`);
@@ -53,7 +40,6 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch team details for the user from API
   const fetchTeamDetails = async (userId) => {
     try {
       const response = await axiosClient.get(`/team/user/${userId}`);
@@ -63,7 +49,6 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch all teams in the organization from API
   const fetchOrgTeam = async (userId) => {
     try {
       const response = await axiosClient.get(`/team/organization/${userId}`);
@@ -73,7 +58,6 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch projects for the user from API
   const fetchProjects = async (userId) => {
     try {
       const response = await axiosClient.get(`/project/${userId}`);
@@ -83,7 +67,6 @@ export default function Dashboard() {
     }
   };
 
-  // Initialize all data when component mounts
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
@@ -103,18 +86,14 @@ export default function Dashboard() {
     initializeData();
   }, []);
 
-  // Handle organization join request
   const handleOrgRequest = () => {
     console.log('Organization request:', orgRequest);
-    // API call to be implemented here
   };
 
-  // Show loading state while data is being fetched
   if (loading) {
     return <DashboardLoading />;
   }
 
-  // Show no organization view if user isn't part of an org
   if (!user?.organizationId) {
     return (
       <NoOrganizationView 
@@ -126,23 +105,30 @@ export default function Dashboard() {
     );
   }
 
-  // Main dashboard view
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gray-50">
       <DashboardHeader user={user} organization={organization} />
-      <DashboardNav 
-        user={user} 
-        team={team}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      />
-      <DashboardContent 
-        activeTab={activeTab}
-        user={user}
-        organization={organization}
-        team={team}
-        project={project}
-      />
+      
+      <div className="flex">
+        <DashboardNav 
+          user={user} 
+          team={team}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />
+
+        <main className="flex-1 min-h-[calc(100vh-64px)] overflow-y-auto">
+          <div className="p-6 max-w-7xl mx-auto">
+            <DashboardContent 
+              activeTab={activeTab}
+              user={user}
+              organization={organization}
+              team={team}
+              project={project}
+            />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
