@@ -1,8 +1,8 @@
 import { jwtDecode } from "jwt-decode";
 import { useState, useEffect } from "react";
 import axiosClient from '../utils/axiosClient';
-import DashboardHeader from '../Components/DashboardHeader'
-import DashboardNav from '../Components/DashboardNav';
+import { DashboardHeader } from '../Components/DashboardHeader';
+import { DashboardNav } from '../Components/DashboardNav';
 import DashboardLoading from '../Components/DashboardLoading';
 import NoOrganizationView from '../Components/NoOrganizationView';
 import DashboardContent from '../Components/DashboardContent';
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [orgRequest, setOrgRequest] = useState('');
 
+  // Existing fetch functions remain the same
   const fetchUserDetails = async () => {
     try {
       const response = await axiosClient.get(`/user/${decodedtoken.id}`);
@@ -107,7 +108,12 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader user={user} organization={organization} />
+      <DashboardHeader 
+        user={user} 
+        organization={organization}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+      />
       
       <div className="flex">
         <DashboardNav 
@@ -117,7 +123,7 @@ export default function Dashboard() {
           setActiveTab={setActiveTab}
         />
 
-        <main className="flex-1 min-h-[calc(100vh-64px)] overflow-y-auto">
+        <main className="flex-1 min-h-[calc(100vh-80px)] overflow-y-auto">
           <div className="p-6 max-w-7xl mx-auto">
             <DashboardContent 
               activeTab={activeTab}
