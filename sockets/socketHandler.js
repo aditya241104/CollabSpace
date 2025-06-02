@@ -1,22 +1,18 @@
-// server/socket/socketHandler.js
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
+const connectedUsers = new Map(); // userId -> socketId
+
 export const handleSocketConnection = (io) => {
-  // Authentication middleware
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
-      if (!token) {
-        return next(new Error('Authentication error'));
-      }
+      if (!token) return next(new Error('Authentication error'));
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.id);
       
-      if (!user) {
-        return next(new Error('User not found'));
-      }
+      if (!user) return next(new Error('User not found'));
 
       socket.userId = user._id.toString();
       socket.user = user;
@@ -30,22 +26,32 @@ export const handleSocketConnection = (io) => {
     const userId = socket.userId;
     
     try {
-      // Set user online when they connect
+      // Store user connection
+      connectedUsers.set(userId, socket.id);
+      
+      // Set user online
       await User.findByIdAndUpdate(userId, {
         isOnline: true,
         socketId: socket.id,
         lastActive: new Date()
       });
 
-      console.log(`User ${socket.user.name} is now online`);
+      // Notify organization members about online status
+      const user = await User.findById(userId);
+      socket.to(`org_${user.organizationId}`).emit('user-status-change', {
+        userId,
+        isOnline: true
+      });
+
+      // Join organization room
+      socket.join(`org_${user.organizationId}`);
+
+      console.log(`User ${userId} connected`);
 
       // Handle activity updates
-      socket.on('updateStatus', async () => {
+      socket.on('user-active', async () => {
         try {
-          await User.findByIdAndUpdate(userId, {
-            lastActive: new Date()
-          });
-          console.log(`Updated activity for user ${socket.user.name}`);
+          await User.findByIdAndUpdate(userId, { lastActive: new Date() });
         } catch (error) {
           console.error('Error updating user activity:', error);
         }
@@ -53,14 +59,25 @@ export const handleSocketConnection = (io) => {
 
       // Handle disconnect
       socket.on('disconnect', async () => {
-        try {
-          await User.findByIdAndUpdate(userId, {
-            isOnline: false,
-            socketId: null,
-            lastActive: new Date()
+      try {
+        connectedUsers.delete(userId);
+        
+        await User.findByIdAndUpdate(userId, {
+          isOnline: false,
+          socketId: null,
+          lastActive: new Date()
+        });
+
+        // Notify organization members about offline status
+        if (user && user.organizationId) {
+          socket.to(`org_${user.organizationId}`).emit('user-status-change', {
+            userId,
+            isOnline: false
           });
-          console.log(`User ${socket.user.name} is now offline`);
-        } catch (error) {
+        }
+
+        console.log(`User ${userId} disconnected`);
+      } catch (error) {
           console.error('Error handling disconnect:', error);
         }
       });
@@ -70,4 +87,6 @@ export const handleSocketConnection = (io) => {
       socket.disconnect();
     }
   });
+
+  return { connectedUsers };
 };

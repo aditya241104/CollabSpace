@@ -8,6 +8,7 @@ import TaskManagement from './tabs/TaskManagement';
 import ProjectManagement from './tabs/ProjectManagement';
 import InviteUser from './tabs/InviteUser';
 import JoinRequestsManager from './tabs/JoinRequestsManager';
+import Chat from './tabs/Chat';
 /**
  * Dashboard Content Component
  * 
@@ -41,6 +42,8 @@ export default function DashboardContent({ activeTab, user, organization, team, 
       return <InviteUser user={user}/>
     case 'manage-invites':
       return <JoinRequestsManager user={user}/>
+    case 'chat':
+      return <Chat currentUser={user}/>
     default:
       return <ComingSoonTab />;
   }

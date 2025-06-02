@@ -5,7 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-
+import chatRoutes from './routes/chatRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import organizationRoutes from './routes/organizationRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
@@ -13,8 +13,8 @@ import userRoutes from './routes/userRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import projectRoutes from "./routes/projectRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
-
-import { handleSocketConnection } from './sockets/socketHandler.js'
+import { handlePrivateChat } from './sockets/privateChat.js';
+import { handleSocketConnection } from './sockets/socketHandler.js';
 
 dotenv.config();
 
@@ -37,7 +37,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// Existing routes
+app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/organization', organizationRoutes);
 app.use('/api/invite', inviteRoutes);
@@ -46,8 +46,9 @@ app.use('/api/team', teamRoutes);
 app.use('/api/project', projectRoutes);
 app.use('/api/task', taskRoutes);
 
-// Initialize Socket.IO for online status tracking
-handleSocketConnection(io);
+// Initialize Socket.IO
+const { connectedUsers } = handleSocketConnection(io);
+handlePrivateChat(io, connectedUsers);
 
 // DB Connect and start server
 mongoose

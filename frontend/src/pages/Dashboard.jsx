@@ -6,6 +6,7 @@ import { DashboardNav } from '../Components/DashboardNav';
 import DashboardLoading from '../Components/DashboardLoading';
 import NoOrganizationView from '../Components/NoOrganizationView';
 import DashboardContent from '../Components/DashboardContent';
+import MobileNavToggle from '../Components/MobileNavToggle';
 
 export default function Dashboard() {
   const token = localStorage.getItem("token");
@@ -20,8 +21,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [orgRequest, setOrgRequest] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // Existing fetch functions remain the same
   const fetchUserDetails = async () => {
     try {
       const response = await axiosClient.get(`/user/${decodedtoken.id}`);
@@ -107,24 +108,47 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <DashboardHeader 
         user={user} 
         organization={organization}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onMobileNavToggle={() => setMobileNavOpen(!mobileNavOpen)}
       />
       
-      <div className="flex">
-        <DashboardNav 
-          user={user} 
-          team={team}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Nav Toggle Button */}
+        <MobileNavToggle 
+          isOpen={mobileNavOpen}
+          onClick={() => setMobileNavOpen(!mobileNavOpen)}
         />
 
-        <main className="flex-1 min-h-[calc(100vh-80px)] overflow-y-auto">
-          <div className="p-6 max-w-7xl mx-auto">
+        {/* Navigation Sidebar */}
+        <div className={`
+          fixed lg:static z-40 w-64 h-full transform transition-transform duration-300 ease-in-out
+          ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
+        `}>
+          <DashboardNav 
+            user={user} 
+            team={team}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onNavigate={() => setMobileNavOpen(false)}
+          />
+        </div>
+
+        {/* Overlay for mobile */}
+        {mobileNavOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 max-w-7xl mx-auto w-full">
             <DashboardContent 
               activeTab={activeTab}
               user={user}

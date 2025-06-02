@@ -1,10 +1,10 @@
 import {
   Users, FolderOpen, BarChart3, User, ChevronRight,
-  ClipboardList, Settings, Home, Briefcase
+  ClipboardList, Settings, Home, Briefcase, MessageSquare, X
 } from "lucide-react";
 import { useState } from "react";
 
-export function DashboardNav({ user, team, activeTab, setActiveTab }) {
+export function DashboardNav({ user, team, activeTab, setActiveTab, onNavigate }) {
   const [collapsed, setCollapsed] = useState(false);
 
   // Core navigation - only essential items
@@ -12,7 +12,8 @@ export function DashboardNav({ user, team, activeTab, setActiveTab }) {
     { id: 'overview', label: 'Dashboard', icon: Home },
     { id: 'projects', label: 'Projects', icon: FolderOpen },
     { id: 'teams', label: 'Teams', icon: Users },
-    { id: 'task', label: 'Tasks', icon: ClipboardList }
+    { id: 'task', label: 'Tasks', icon: ClipboardList },
+    { id: 'chat', label: 'Chat', icon: MessageSquare }
   ];
 
   // Management navigation - based on role
@@ -58,17 +59,29 @@ export function DashboardNav({ user, team, activeTab, setActiveTab }) {
         {!collapsed && (
           <h2 className="text-lg font-semibold text-gray-800">Navigation</h2>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <ChevronRight
-            className={`h-4 w-4 text-gray-500 transform transition-transform duration-300 ${
-              collapsed ? 'rotate-180' : ''
-            }`}
-          />
-        </button>
+        <div className="flex items-center">
+          <button
+            onClick={() => {
+              setCollapsed(!collapsed);
+              if (onNavigate) onNavigate();
+            }}
+            className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors hidden lg:block"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <ChevronRight
+              className={`h-4 w-4 text-gray-500 transform transition-transform duration-300 ${
+                collapsed ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       <nav className="flex-1 flex flex-col p-3 overflow-y-auto">
@@ -82,7 +95,10 @@ export function DashboardNav({ user, team, activeTab, setActiveTab }) {
           {coreNavigation.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                if (onNavigate) onNavigate();
+              }}
               className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-all w-full
                 ${activeTab === item.id
                   ? 'bg-indigo-50 text-indigo-600 shadow-sm border-r-2 border-indigo-600'
@@ -107,7 +123,10 @@ export function DashboardNav({ user, team, activeTab, setActiveTab }) {
             {managementItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  if (onNavigate) onNavigate();
+                }}
                 className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-all w-full
                   ${activeTab === item.id
                     ? 'bg-indigo-50 text-indigo-600 shadow-sm border-r-2 border-indigo-600'
@@ -125,7 +144,10 @@ export function DashboardNav({ user, team, activeTab, setActiveTab }) {
         {/* Settings at bottom of nav */}
         <div className="mt-auto pt-4 border-t border-gray-100">
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => {
+              setActiveTab('settings');
+              if (onNavigate) onNavigate();
+            }}
             className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-all w-full
               ${activeTab === 'settings'
                 ? 'bg-indigo-50 text-indigo-600 shadow-sm'
