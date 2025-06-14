@@ -18,9 +18,12 @@ const userSchema = new mongoose.Schema({
     enum: ["admin", "project_manager", "developer", "hr", "viewer"],
     default: "developer"
   },
+  publicKey: String,
+  encryptedPrivateKey: String,
+  keySalt: String,
   isOnline: { type: Boolean, default: false },
   socketId: { type: String, default: null },
-
+  
   joinedAt: { type: Date, default: Date.now },
   lastActive: { type: Date, default: Date.now },
 });

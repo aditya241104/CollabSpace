@@ -70,7 +70,11 @@ export const handlePrivateChat = (io, connectedUsers) => {
           });
           
           // Update message status to delivered
-          await Message.findByIdAndUpdate(message._id, { messageStatus: 'delivered' });
+          await Message.findByIdAndUpdate(message._id, {
+            $set: {
+              messageStatus: 'delivered'
+            }
+          });
         }
 
         // Confirm to sender
@@ -102,11 +106,14 @@ export const handlePrivateChat = (io, connectedUsers) => {
         messages.forEach(msg => {
           const senderSocketId = connectedUsers.get(msg.senderId._id.toString());
           if (senderSocketId) {
-            io.to(senderSocketId).emit('message-read', {
-              messageId: msg._id,
-              chatId: chatId,
-              readBy: userId
-            });
+          io.to(senderSocketId).emit('message-read', {
+          messageId: msg._id,
+          chatId: chatId,
+          readBy: {
+            userId,
+            readAt: new Date()
+          }
+        });
           }
         });
 

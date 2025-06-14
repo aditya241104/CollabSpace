@@ -23,7 +23,9 @@ export const handleSocketConnection = (io) => {
   });
 
   io.on('connection', async (socket) => {
-    const userId = socket.userId;
+    const userId = socket.userId; 
+    socket.emit('initial-online-users', Array.from(connectedUsers.keys()));
+
     
     try {
       // Store user connection

@@ -5,10 +5,12 @@ import jwt from 'jsonwebtoken';
 import {createRefreshToken,deleteRefreshToken} from './refreshTokenController.js';
 const JWT_SECRET = process.env.JWT_SECRET ||"a92fe4f91c98ee5d99215d8824e1a3b83051c53f9b5a6d9cf13f82a2ab99254e";
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "your_refresh_jwt_secret";
-
+import { generateKeyPair,encryptPrivateKey } from "../utils/crypto.js";
+import crypto from 'crypto';
 // Register user controller
 const registerUser = async (req, res) => {
   try {
+
     const errors = validationResult(req);
     if (!errors.isEmpty())
       return res.status(400).json({ errors: errors.array() });
@@ -23,12 +25,18 @@ const registerUser = async (req, res) => {
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(userPassword, salt);
-
+    const keySalt = crypto.randomBytes(16).toString('hex');
+    const encryptionKey = crypto.pbkdf2Sync(userPassword, keySalt, 100000, 32, 'sha512');
+    const { publicKey, secretKey } = generateKeyPair();
+    const encryptedPrivateKey = encryptPrivateKey(secretKey, encryptionKey,keySalt);
     const user = new User({
       name: userName,
       email: userEmail,
       passwordHash,
       organizationId,
+      publicKey,
+      encryptedPrivateKey,
+      keySalt: keySalt,
     });
 
     await user.save();

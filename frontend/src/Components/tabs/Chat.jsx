@@ -69,46 +69,47 @@ const Chat = ({ currentUser }) => {
 
         // Message handlers
         socket.on('receive-message', (message) => {
-          if (selectedChat && message.chatId === selectedChat._id) {
-            setMessages(prev => {
-              // Prevent duplicate messages
-              if (prev.some(msg => msg._id === message._id)) return prev;
-              return [...prev, message];
-            });
-            
-            // Mark as read if chat is active
-            socket.emit('mark-as-read', {
-              chatId: message.chatId,
-              messageIds: [message._id]
-            });
-          }
-          updateChatLatestMessage(message);
-        });
+        if (selectedChat && message.chatId === selectedChat._id) {
+          setMessages(prev => {
+            if (prev.some(msg => msg._id === message._id)) return prev;
+            return [...prev, { ...message, messageStatus: 'delivered' }];
+          });
+
+          socket.emit('mark-as-read', {
+            chatId: message.chatId,
+            messageIds: [message._id]
+          });
+        }
+        updateChatLatestMessage({ ...message, messageStatus: 'delivered' });
+      });
+
 
         socket.on('message-sent', (message) => {
-          if (selectedChat && message.chatId === selectedChat._id) {
-            setMessages(prev => {
-              // Update existing message or add new one
-              const existingIndex = prev.findIndex(msg => msg.tempId === message.tempId);
-              if (existingIndex >= 0) {
-                const newMessages = [...prev];
-                newMessages[existingIndex] = message;
-                return newMessages;
-              }
-              return [...prev, message];
-            });
-          }
-          updateChatLatestMessage(message);
-        });
+        if (selectedChat && message.chatId === selectedChat._id) {
+          setMessages(prev => {
+            const existingIndex = prev.findIndex(msg => msg.tempId === message.tempId);
+            if (existingIndex >= 0) {
+              const updatedMessage = {
+                ...message,
+                messageStatus: message.messageStatus || 'sent'
+              };
+              const newMessages = [...prev];
+              newMessages[existingIndex] = updatedMessage;
+              return newMessages;
+            }
+            return [...prev, message];
+          });
+        }
+        updateChatLatestMessage(message);
+      });
 
-        socket.on('message-read', ({ messageId, chatId, readBy }) => {
-          if (selectedChat && chatId === selectedChat._id) {
-            setMessages(prev => prev.map(msg => 
-              msg._id === messageId ? { ...msg, messageStatus: 'read', readBy } : msg
-            ));
-          }
-        });
-
+      socket.on('message-read', ({ messageId, chatId, readBy }) => {
+        if (selectedChat && chatId === selectedChat._id) {
+          setMessages(prev => prev.map(msg => 
+            msg._id === messageId ? { ...msg, messageStatus: 'read', readBy } : msg
+          ));
+        }
+      });
         socket.on('user-typing', ({ chatId, userId, userName, isTyping }) => {
           if (selectedChat && chatId === selectedChat._id && userId !== currentUser._id) {
             setTypingUsers(prev => {
@@ -123,17 +124,9 @@ const Chat = ({ currentUser }) => {
           }
         });
 
-        socket.on('user-status-change', ({ userId, isOnline }) => {
-          setOnlineUsers(prev => {
-            const newSet = new Set(prev);
-            if (isOnline) {
-              newSet.add(userId);
-            } else {
-              newSet.delete(userId);
-            }
-            return newSet;
-          });
-        });
+socket.on('initial-online-users', (userIds) => {
+  setOnlineUsers(new Set(userIds));
+});
 
         socket.on('error', (error) => {
           console.error('Socket error:', error);
