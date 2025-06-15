@@ -1,33 +1,23 @@
 import Chat from "../models/Chat.js";
 import Message from '../models/Message.js';
 import User from "../models/User.js";
+import { decryptMessage } from "../utils/crypto.js";
 
-const accessChat = async (req, res) => {
+export const accessChat = async (req, res) => {
   try {
     const { userId } = req.body;
     const senderId = req.user._id;
 
-    // Fetch sender and receiver
-    const sender = await User.findById(senderId);
     const receiver = await User.findById(userId);
-
     if (!receiver) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if (!sender.organizationId.equals(receiver.organizationId)) {
-      return res.status(400).json({ 
-        message: "You can't send a message outside the organization" 
-      });
-    }
-
-    // Check if chat already exists
     let chat = await Chat.findOne({
       isGroupChat: false,
       users: { $all: [senderId, userId], $size: 2 },
     }).populate('users', 'name email avatar isOnline');
 
-    // If no chat, create a new one
     if (!chat) {
       chat = new Chat({
         users: [senderId, userId],
@@ -38,12 +28,12 @@ const accessChat = async (req, res) => {
 
     res.status(200).json(chat);
   } catch (err) {
-    console.error(err);
+    console.error('Error accessing chat:', err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-const getUserChats = async (req, res) => {
+export const getUserChats = async (req, res) => {
   try {
     const userId = req.user._id;
     
@@ -60,32 +50,17 @@ const getUserChats = async (req, res) => {
     })
     .sort({ updatedAt: -1 });
 
-    // Get unread message counts for each chat
-    const chatsWithUnread = await Promise.all(
-      chats.map(async (chat) => {
-        const unreadCount = await Message.countDocuments({
-          chatId: chat._id,
-          senderId: { $ne: userId },
-          messageStatus: { $ne: 'read' }
-        });
-
-        return {
-          ...chat.toObject(),
-          unreadCount
-        };
-      })
-    );
-
-    res.status(200).json(chatsWithUnread);
+    res.status(200).json(chats);
   } catch (err) {
-    console.error(err);
+    console.error('Error getting user chats:', err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-const getMessages = async (req, res) => {
+export const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
+    const userId = req.user._id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
@@ -97,14 +72,39 @@ const getMessages = async (req, res) => {
       .populate('senderId', 'name avatar')
       .populate('readBy.userId', 'name');
 
-    res.json(messages.reverse()); // Reverse to get chronological order
+    // Get user's encryption key
+    const user = await User.findById(userId);
+    const secretKey = user.encryptionKey;
+
+    const decryptedMessages = messages.map(message => {
+      if (message.encryptedContent && secretKey) {
+        try {
+          const decryptedContent = decryptMessage(message.encryptedContent, secretKey);
+          return {
+            ...message.toObject(),
+            content: decryptedContent,
+            encryptedContent: undefined
+          };
+        } catch (error) {
+          console.error('Decryption failed:', error);
+          return {
+            ...message.toObject(),
+            content: '[Encrypted message]',
+            isEncrypted: true
+          };
+        }
+      }
+      return message.toObject();
+    });
+
+    res.json(decryptedMessages.reverse());
   } catch (error) {
-    console.error(error);
+    console.error('Error getting messages:', error);
     res.status(500).json({ message: 'Error fetching messages' });
   }
 };
 
-const searchUsers = async (req, res) => {
+export const searchUsers = async (req, res) => {
   try {
     const { query } = req.query;
     const currentUserId = req.user._id;
@@ -119,9 +119,7 @@ const searchUsers = async (req, res) => {
 
     res.json(users);
   } catch (error) {
-    console.error(error);
+    console.error('Error searching users:', error);
     res.status(500).json({ message: 'Error searching users' });
   }
 };
-
-export { accessChat, getUserChats, getMessages, searchUsers };

@@ -4,6 +4,7 @@ const messageSchema = new mongoose.Schema({
   chatId: { type: mongoose.Schema.Types.ObjectId, ref: "Chat", required: true },
   senderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   content: String,
+  encryptedContent: String, // Format: "iv:encryptedText"
   messageType: { type: String, enum: ["text", "file", "system"], default: "text" },
   messageStatus: {
     type: String,

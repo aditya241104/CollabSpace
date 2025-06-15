@@ -3,28 +3,31 @@ import { io } from 'socket.io-client';
 let socket = null;
 
 export const connectSocket = (token) => {
-  if (socket) {
-    socket.disconnect();
+  // Only create new socket if none exists or previous one is disconnected
+  if (!socket || socket.disconnected) {
+    if (socket) socket.disconnect();
+
+    socket = io('http://localhost:3000', {
+      auth: { token },
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      autoConnect: true
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket connected');
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
   }
-
-  socket = io('http://localhost:3000', {
-    auth: {
-      token: token
-    },
-    autoConnect: true
-  });
-
-  socket.on('connect', () => {
-    console.log('Connected to server - User is now online');
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Disconnected from server - User is now offline');
-  });
-
-  socket.on('connect_error', (error) => {
-    console.error('Connection error:', error.message);
-  });
 
   return socket;
 };
@@ -41,3 +44,5 @@ export const emitStatusUpdate = () => {
     socket.emit('updateStatus');
   }
 };
+
+export const getSocket = () => socket;

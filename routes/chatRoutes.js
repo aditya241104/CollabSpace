@@ -1,4 +1,9 @@
-import { accessChat, getUserChats, getMessages, searchUsers } from "../controllers/chatController.js";
+import { 
+  accessChat, 
+  getUserChats, 
+  getMessages, 
+  searchUsers 
+} from "../controllers/chatController.js";
 import express from 'express';
 import verifyToken from "../middlewares/authMiddleware.js";
 

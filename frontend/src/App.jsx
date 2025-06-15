@@ -1,10 +1,9 @@
-// client/src/App.jsx
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import { isTokenValid } from './utils/auth';
-import { connectSocket, disconnectSocket, emitStatusUpdate } from './socket/socket'
+import { connectSocket, disconnectSocket, emitStatusUpdate } from './socket/socket';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
@@ -14,25 +13,32 @@ function App() {
     return token && isTokenValid(token);
   });
 
+  const refreshAccessToken = async () => {
+    try {
+      const response = await axios.post('/api/auth/refresh-token');
+      return response.data.token;
+    } catch (error) {
+      throw new Error('Failed to refresh token');
+    }
+  };
+
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
 
       if (token && isTokenValid(token)) {
         setIsAuthenticated(true);
-        // Connect socket when authenticated - sets user online
         connectSocket(token);
       } else {
         try {
           const newToken = await refreshAccessToken(); 
           localStorage.setItem("token", newToken);
           setIsAuthenticated(true);
-          // Connect socket with new token - sets user online
           connectSocket(newToken);
         } catch (error) {
           setIsAuthenticated(false);
           localStorage.removeItem('token');
-          disconnectSocket(); // Sets user offline
+          disconnectSocket();
         }
       }
     };
@@ -40,19 +46,12 @@ function App() {
     checkAuth();
   }, []);
 
-  // Handle authentication state changes
   useEffect(() => {
-    if (isAuthenticated) {
-      const token = localStorage.getItem('token');
-      if (token) {
-        connectSocket(token); // Sets user online
-      }
-    } else {
-      disconnectSocket(); // Sets user offline
+    if (!isAuthenticated) {
+      disconnectSocket();
     }
   }, [isAuthenticated]);
 
-  // Track user activity and update lastActive
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -61,26 +60,19 @@ function App() {
 
     const handleActivity = () => {
       clearTimeout(activityTimeout);
-      
-      // Update user activity in database
       emitStatusUpdate();
-      
-      // Set timeout for next update (every 2 minutes of activity)
       activityTimeout = setTimeout(() => {
         emitStatusUpdate();
       }, 2 * 60 * 1000);
     };
 
-    // Add event listeners for user activity
     activityEvents.forEach(event => {
       document.addEventListener(event, handleActivity, true);
     });
 
-    // Initial activity update
     handleActivity();
 
     return () => {
-      // Cleanup event listeners and timeout
       activityEvents.forEach(event => {
         document.removeEventListener(event, handleActivity, true);
       });
@@ -88,13 +80,11 @@ function App() {
     };
   }, [isAuthenticated]);
 
-  // Handle page visibility changes (tab switching, minimizing)
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Page became visible - update activity
         emitStatusUpdate();
       }
     };
@@ -103,10 +93,9 @@ function App() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isAuthenticated]);
 
-  // Handle browser close/refresh - cleanup
   useEffect(() => {
     const handleBeforeUnload = () => {
-      disconnectSocket(); // This will set user offline
+      disconnectSocket();
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -120,7 +109,7 @@ function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('token');
-    disconnectSocket(); // Sets user offline
+    disconnectSocket();
   };
 
   return (

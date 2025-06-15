@@ -1,4 +1,3 @@
-// server/index.js
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -47,8 +46,8 @@ app.use('/api/project', projectRoutes);
 app.use('/api/task', taskRoutes);
 
 // Initialize Socket.IO
-const { connectedUsers } = handleSocketConnection(io);
-handlePrivateChat(io, connectedUsers);
+handleSocketConnection(io);
+handlePrivateChat(io);
 
 // DB Connect and start server
 mongoose

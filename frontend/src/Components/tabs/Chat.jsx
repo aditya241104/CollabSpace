@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { io } from 'socket.io-client';
+import { connectSocket } from '../../socket/socket.js';
 import axiosClient from '../../utils/axiosClient';
 import ChatList from './ChatComponents/ChatList';
 import ChatWindow from './ChatComponents/ChatWindow';
@@ -41,110 +41,70 @@ const Chat = ({ currentUser }) => {
   useEffect(() => {
     if (!currentUser) return;
 
-    const connectSocket = () => {
-      try {
-        socketRef.current = io('http://localhost:3000', {
-          auth: { token: localStorage.getItem('token') },
-          transports: ['websocket'],
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    socketRef.current = connectSocket(token);
+    const socket = socketRef.current;
+
+    socket.on('connect', () => {
+      console.log('Connected to socket server');
+      setError(null);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Disconnected from socket server:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      setError('Connection error. Trying to reconnect...');
+    });
+
+    socket.on('receive-message', (message) => {
+      if (selectedChat && message.chatId === selectedChat._id) {
+        setMessages(prev => {
+          if (prev.some(msg => msg._id === message._id)) return prev;
+          return [...prev, { ...message, messageStatus: 'delivered' }];
         });
 
-        const socket = socketRef.current;
-
-        socket.on('connect', () => {
-          console.log('Connected to socket server');
-          setError(null);
+        socket.emit('mark-as-read', {
+          chatId: message.chatId,
+          messageIds: [message._id]
         });
-
-        socket.on('disconnect', (reason) => {
-          console.log('Disconnected from socket server:', reason);
-        });
-
-        socket.on('connect_error', (error) => {
-          console.error('Socket connection error:', error);
-          setError('Connection error. Trying to reconnect...');
-        });
-
-        // Message handlers
-        socket.on('receive-message', (message) => {
-        if (selectedChat && message.chatId === selectedChat._id) {
-          setMessages(prev => {
-            if (prev.some(msg => msg._id === message._id)) return prev;
-            return [...prev, { ...message, messageStatus: 'delivered' }];
-          });
-
-          socket.emit('mark-as-read', {
-            chatId: message.chatId,
-            messageIds: [message._id]
-          });
-        }
-        updateChatLatestMessage({ ...message, messageStatus: 'delivered' });
-      });
-
-
-        socket.on('message-sent', (message) => {
-        if (selectedChat && message.chatId === selectedChat._id) {
-          setMessages(prev => {
-            const existingIndex = prev.findIndex(msg => msg.tempId === message.tempId);
-            if (existingIndex >= 0) {
-              const updatedMessage = {
-                ...message,
-                messageStatus: message.messageStatus || 'sent'
-              };
-              const newMessages = [...prev];
-              newMessages[existingIndex] = updatedMessage;
-              return newMessages;
-            }
-            return [...prev, message];
-          });
-        }
-        updateChatLatestMessage(message);
-      });
-
-      socket.on('message-read', ({ messageId, chatId, readBy }) => {
-        if (selectedChat && chatId === selectedChat._id) {
-          setMessages(prev => prev.map(msg => 
-            msg._id === messageId ? { ...msg, messageStatus: 'read', readBy } : msg
-          ));
-        }
-      });
-        socket.on('user-typing', ({ chatId, userId, userName, isTyping }) => {
-          if (selectedChat && chatId === selectedChat._id && userId !== currentUser._id) {
-            setTypingUsers(prev => {
-              const newMap = new Map(prev);
-              if (isTyping) {
-                newMap.set(userId, { userId, userName });
-              } else {
-                newMap.delete(userId);
-              }
-              return newMap;
-            });
-          }
-        });
-
-socket.on('initial-online-users', (userIds) => {
-  setOnlineUsers(new Set(userIds));
-});
-
-        socket.on('error', (error) => {
-          console.error('Socket error:', error);
-          setError(error.message || 'An error occurred');
-        });
-
-      } catch (error) {
-        console.error('Failed to initialize socket:', error);
-        setError('Failed to connect to chat server');
       }
-    };
+      updateChatLatestMessage({ ...message, messageStatus: 'delivered' });
+    });
 
-    connectSocket();
+    socket.on('message-sent', (message) => {
+      if (selectedChat && message.chatId === selectedChat._id) {
+        setMessages(prev => {
+          const existingIndex = prev.findIndex(msg => msg.tempId === message.tempId);
+          if (existingIndex >= 0) {
+            const updatedMessage = {
+              ...message,
+              messageStatus: message.messageStatus || 'sent'
+            };
+            const newMessages = [...prev];
+            newMessages[existingIndex] = updatedMessage;
+            return newMessages;
+          }
+          return [...prev, message];
+        });
+      }
+      updateChatLatestMessage(message);
+    });
+
+    socket.on('initial-online-users', (userIds) => {
+      setOnlineUsers(new Set(userIds));
+    });
+
+    socket.on('error', (error) => {
+      console.error('Socket error:', error);
+      setError(error.message || 'An error occurred');
+    });
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
@@ -159,14 +119,20 @@ socket.on('initial-online-users', (userIds) => {
       setLoading(true);
       try {
         const response = await axiosClient.get('/chat/user-chats');
-        const sortedChats = response.data.sort((a, b) => 
+        console.log("sortedchats", response);
+        if (!response.data || !Array.isArray(response.data)) {
+          throw new Error('Invalid response format');
+        }
+
+        const sortedChats = [...response.data].sort((a, b) => 
           new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)
         );
         setChats(sortedChats);
         setError(null);
       } catch (error) {
         console.error('Error fetching chats:', error);
-        setError('Failed to load chats');
+        setError(error.response?.data?.message || 'Failed to load chats');
+        setChats([]);
       } finally {
         setLoading(false);
       }
@@ -182,40 +148,39 @@ socket.on('initial-online-users', (userIds) => {
       return;
     }
 
-    const fetchMessages = async () => {
-      setLoading(true);
-      try {
-        const response = await axiosClient.get(`/chat/messages/${selectedChat._id}`);
-        setMessages(response.data);
-        
-        // Join chat room
-        socketRef.current?.emit('join-chat', selectedChat._id);
-        
-        // Mark unread messages as read
-        const unreadMessages = response.data
-          .filter(msg => msg.senderId !== currentUser._id && msg.messageStatus !== 'read')
-          .map(msg => msg._id);
-          
-        if (unreadMessages.length > 0) {
-          socketRef.current?.emit('mark-as-read', {
-            chatId: selectedChat._id,
-            messageIds: unreadMessages
-          });
-        }
+  const fetchMessages = async () => {
+  setLoading(true);
+  try {
+    const response = await axiosClient.get(`/chat/messages/${selectedChat._id}`, {
+      data: { password: currentUser.password } // Send password in the request body
+    });
+    setMessages(response.data);
+    
+    socketRef.current?.emit('join-chat', selectedChat._id);
+    
+    const unreadMessages = response.data
+      .filter(msg => msg.senderId !== currentUser._id && msg.messageStatus !== 'read')
+      .map(msg => msg._id);
+      
+    if (unreadMessages.length > 0) {
+      socketRef.current?.emit('mark-as-read', {
+        chatId: selectedChat._id,
+        messageIds: unreadMessages
+      });
+    }
 
-        // Reset unread count for selected chat
-        setChats(prev => prev.map(chat => 
-          chat._id === selectedChat._id ? { ...chat, unreadCount: 0 } : chat
-        ));
+    setChats(prev => prev.map(chat => 
+      chat._id === selectedChat._id ? { ...chat, unreadCount: 0 } : chat
+    ));
 
-        setError(null);
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-        setError('Failed to load messages');
-      } finally {
-        setLoading(false);
-      }
-    };
+    setError(null);
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    setError('Failed to load messages');
+  } finally {
+    setLoading(false);
+  }
+};
 
     fetchMessages();
     
@@ -226,13 +191,12 @@ socket.on('initial-online-users', (userIds) => {
     };
   }, [selectedChat, currentUser]);
 
-  const handleSendMessage = useCallback((content) => {
+  const handleSendMessage = useCallback(async (content) => {
     if (!selectedChat || !content.trim() || !socketRef.current) return;
 
     const receiverId = selectedChat.users.find(user => user._id !== currentUser._id)?._id;
     if (!receiverId) return;
 
-    // Create temporary message for optimistic UI
     const tempMessage = {
       _id: `temp_${Date.now()}`,
       tempId: `temp_${Date.now()}`,
@@ -243,10 +207,8 @@ socket.on('initial-online-users', (userIds) => {
       messageStatus: 'sending'
     };
 
-    // Add message to UI immediately
     setMessages(prev => [...prev, tempMessage]);
 
-    // Send through socket
     socketRef.current.emit('send-message', {
       receiverId,
       content: content.trim(),
@@ -263,12 +225,10 @@ socket.on('initial-online-users', (userIds) => {
       userName: currentUser.name 
     });
     
-    // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
     
-    // Stop typing after 2 seconds of inactivity
     typingTimeoutRef.current = setTimeout(() => {
       socketRef.current?.emit('typing-stop', { chatId: selectedChat._id });
     }, 2000);
@@ -330,7 +290,6 @@ socket.on('initial-online-users', (userIds) => {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Error banner */}
       {error && (
         <div className="absolute top-0 left-0 right-0 bg-red-500 text-white px-4 py-2 text-sm z-50">
           {error}
@@ -343,7 +302,6 @@ socket.on('initial-online-users', (userIds) => {
         </div>
       )}
 
-      {/* Chat List Sidebar */}
       <div className={`${showSearch ? 'hidden md:block' : 'block'} w-full md:w-1/3 lg:w-1/4 bg-white border-r ${error ? 'mt-10' : ''}`}>
         <div className="p-4 border-b">
           <h2 className="text-xl font-semibold text-gray-800">Chats</h2>
@@ -365,7 +323,6 @@ socket.on('initial-online-users', (userIds) => {
         />
       </div>
 
-      {/* Main Chat Area */}
       <div className={`${showSearch ? 'block' : 'hidden md:block'} flex-1 flex flex-col ${error ? 'mt-10' : ''}`}>
         {showSearch ? (
           <SearchUsers 

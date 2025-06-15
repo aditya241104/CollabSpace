@@ -1,88 +1,79 @@
-import jwt from 'jsonwebtoken';
-import Chat from "../models/Chat.js";
 import Message from '../models/Message.js';
-import User from "../models/User.js";
+import Chat from '../models/Chat.js';
+import User from '../models/User.js';
+import { encryptMessage } from '../utils/crypto.js';
 
-const typingUsers = new Map(); // chatId -> Set of userIds
-
-export const handlePrivateChat = (io, connectedUsers) => {
+export const handlePrivateChat = (io) => {
   io.on('connection', (socket) => {
-    
-    // Send message
     socket.on('send-message', async (data) => {
       try {
-        const { receiverId, content, chatId } = data;
+        const { receiverId, content, chatId, tempId } = data;
         const senderId = socket.userId;
 
+        // Get sender's encryption key
         const sender = await User.findById(senderId);
-        const receiver = await User.findById(receiverId);
-
-        if (!sender || !receiver) {
-          socket.emit('error', { message: 'User not found' });
-          return;
+        if (!sender || !sender.encryptionKey) {
+          throw new Error('Sender encryption not configured');
         }
 
-        if (!sender.organizationId.equals(receiver.organizationId)) {
-          socket.emit('error', { message: 'Cannot send message outside organization' });
-          return;
-        }
+        // Encrypt the message
+        const encryptedData = encryptMessage(content, sender.encryptionKey);
 
-        let chat = await Chat.findOne({
-          isGroupChat: false,
-          users: { $all: [senderId, receiverId], $size: 2 },
-        });
-
-        if (!chat) {
-          chat = new Chat({
-            users: [senderId, receiverId],
-          });
-          await chat.save();
-        }
-
+        // Save encrypted message
         const message = new Message({
-          chatId: chat._id,
-          senderId: senderId,
-          content: content,
+          chatId,
+          senderId,
+          encryptedContent: encryptedData,
           messageType: 'text',
           messageStatus: 'sent'
         });
+        
         await message.save();
 
-        chat.latestMessage = message._id;
-        await chat.save();
+        // Update chat's latest message
+        await Chat.findByIdAndUpdate(chatId, {
+          latestMessage: message._id,
+          updatedAt: new Date()
+        });
 
+        // Prepare message data for delivery
         const messageData = {
           _id: message._id,
-          chatId: chat._id,
-          senderId: senderId,
-          content: content,
+          chatId,
+          senderId,
+          content, // Plain text for sender
           messageType: 'text',
           messageStatus: 'sent',
           createdAt: message.createdAt,
+          tempId
         };
 
-        // Send to receiver if online
-        const receiverSocketId = connectedUsers.get(receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit('receive-message', {
-            ...messageData,
-            messageStatus: 'delivered'
-          });
-          
-          // Update message status to delivered
-          await Message.findByIdAndUpdate(message._id, {
-            $set: {
+        // Deliver to receiver if online
+        const receiver = await User.findById(receiverId);
+        if (receiver && receiver.socketId && receiver.encryptionKey) {
+          try {
+            // Receiver will decrypt on their side when fetching messages
+            io.to(receiver.socketId).emit('receive-message', {
+              ...messageData,
               messageStatus: 'delivered'
-            }
-          });
+            });
+            
+            await Message.findByIdAndUpdate(message._id, {
+              messageStatus: 'delivered'
+            });
+          } catch (error) {
+            console.error('Error delivering message:', error);
+          }
         }
 
         // Confirm to sender
         socket.emit('message-sent', messageData);
 
-      } catch (err) {
-        console.error(err);
-        socket.emit('error', { message: 'Server error' });
+      } catch (error) {
+        console.error('Error sending message:', error);
+        socket.emit('error', { 
+          message: 'Failed to send message'
+        });
       }
     });
 
@@ -100,80 +91,54 @@ export const handlePrivateChat = (io, connectedUsers) => {
           }
         );
 
-        // Notify sender about read status
+        // Notify senders about read status
         const messages = await Message.find({ _id: { $in: messageIds } }).populate('senderId');
         
         messages.forEach(msg => {
-          const senderSocketId = connectedUsers.get(msg.senderId._id.toString());
-          if (senderSocketId) {
-          io.to(senderSocketId).emit('message-read', {
-          messageId: msg._id,
-          chatId: chatId,
-          readBy: {
-            userId,
-            readAt: new Date()
-          }
-        });
+          const sender = msg.senderId;
+          if (sender && sender.socketId) {
+            io.to(sender.socketId).emit('message-read', {
+              messageId: msg._id,
+              chatId: chatId,
+              readBy: {
+                userId,
+                readAt: new Date()
+              }
+            });
           }
         });
 
-      } catch (err) {
-        console.error(err);
-        socket.emit('error', { message: 'Error marking messages as read' });
+      } catch (error) {
+        console.error('Error marking messages as read:', error);
       }
     });
 
-    // Typing indicator
-  socket.on('typing-start', (data) => {
-    try {
+    // Typing indicators
+    socket.on('typing-start', (data) => {
       const { chatId } = data;
-      const userId = socket.userId;
-      const userName = socket.user.name; // Add this line
-
-      if (!typingUsers.has(chatId)) {
-        typingUsers.set(chatId, new Set());
-      }
-      typingUsers.get(chatId).add({ userId, userName }); // Modified this line
-
       socket.to(chatId).emit('user-typing', {
         chatId,
-        userId,
-        userName, // Add this line
+        userId: socket.userId,
         isTyping: true
       });
-    } catch (err) {
-      console.error(err);
-    }
-  });
-
-socket.on('typing-stop', (data) => {
-  try {
-    const { chatId } = data;
-    const userId = socket.userId;
-
-    if (typingUsers.has(chatId)) {
-      typingUsers.get(chatId).delete(userId);
-    }
-
-    socket.to(chatId).emit('user-typing', {
-      chatId,
-      userId,
-      isTyping: false
     });
-  } catch (err) {
-    console.error(err);
-  }
-});
 
-    // Join chat room
+    socket.on('typing-stop', (data) => {
+      const { chatId } = data;
+      socket.to(chatId).emit('user-typing', {
+        chatId,
+        userId: socket.userId,
+        isTyping: false
+      });
+    });
+
+    // Join/leave chat rooms
     socket.on('join-chat', (chatId) => {
       socket.join(chatId);
     });
 
-    // Leave chat room
     socket.on('leave-chat', (chatId) => {
       socket.leave(chatId);
     });
-
   });
 };
